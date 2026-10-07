@@ -16,14 +16,14 @@ Swap secrets for random tokens before text leaves your server (for example, to a
 
 - Python 3.10 to 3.13 for the in-memory server (the classifiers list these; CI runs 3.10, 3.12, and 3.13). The persistent modules need Python 3.11+ and refuse to import on 3.10 (CI runs them on 3.11 and 3.12)
 - Node.js 20, 22, or 24 on `PATH`
-- `@redact-secret/core` at exactly `0.1.0-beta.13`, installed with npm in a directory your application owns
+- `@redact-secret/core` at exactly `0.1.0-beta.14`, installed with npm in a directory your application owns
 
 ## Install
 
 ```bash
-pip install redact-secret-vault==0.1.0b5
+pip install redact-secret-vault==0.1.0b6
 # In a directory of your choice, for example /srv/myapp/core:
-npm install @redact-secret/core@0.1.0-beta.13
+npm install @redact-secret/core@0.1.0-beta.14
 ```
 
 Tell the bridge where that `node_modules` is, in code or through the environment:
@@ -45,7 +45,7 @@ python -m redact_secret_vault doctor --node-modules /srv/myapp/core/node_modules
 ```text
 ok    node: v22.16.0
 ok    core location: /srv/myapp/core/node_modules (from --node-modules)
-ok    core: @redact-secret/core 0.1.0-beta.13 loaded (addon)
+ok    core: @redact-secret/core 0.1.0-beta.14 loaded (addon)
 ok    scan: 1 finding(s) in the synthetic input
 ```
 
@@ -123,7 +123,7 @@ A complete version that also shows a denied restore: [examples/05-python-server.
 
 ## Persistent modules (shipped in 0.1.0b4 behind extras, not supported)
 
-`pip install redact-secret-vault==0.1.0b5` puts these modules in the environment; `0.1.0b3` does not contain them. Each is behind an extra that brings its dependency (for example `pip install "redact-secret-vault[postgres]==0.1.0b4"`), and the base install keeps no runtime dependency. They need Python 3.11 or later. The API is `async` only (`Store`, `KeyProvider`, and `RecordCrypto` are protocols with `async def` methods); there is no synchronous twin. Status words follow [CONVENTIONS.md](https://github.com/redact-secret/redact-secret-vault/blob/main/CONVENTIONS.md#status-language): **implemented** here means the code exists and passed the runs named in the record, **not supported** means no support claim is made.
+`pip install redact-secret-vault==0.1.0b6` puts these modules in the environment; `0.1.0b3` does not contain them. Each is behind an extra that brings its dependency (for example `pip install "redact-secret-vault[postgres]==0.1.0b4"`), and the base install keeps no runtime dependency. They need Python 3.11 or later. The API is `async` only (`Store`, `KeyProvider`, and `RecordCrypto` are protocols with `async def` methods); there is no synchronous twin. Status words follow [CONVENTIONS.md](https://github.com/redact-secret/redact-secret-vault/blob/main/CONVENTIONS.md#status-language): **implemented** here means the code exists and passed the runs named in the record, **not supported** means no support claim is made.
 
 | Import path | Extra | What it is | Status |
 | --- | --- | --- | --- |
@@ -138,7 +138,7 @@ A complete version that also shows a denied restore: [examples/05-python-server.
 - **No default key.** The key material, the digest key, the pool, and the KMS client are all supplied by the application. A bytes key in Python memory cannot be cleared; the package overwrites the buffers it owns and says so, and does not claim more.
 - **At rest is not everywhere.** Encryption at rest covers what the store holds. The whole capture input, every secret in it and not only the retained values, still goes to the Node.js bridge and stays in its heap until it is collected or the process exits. **The bridge is research-grade and not qualified**, and the Python qualification does not include it: any deployment claim is for an application-supplied, separately qualified `CoreClient` ([decision](https://github.com/redact-secret/redact-secret-vault/blob/main/docs/decisions/limit-python-persistence-claim-to-a-supplied-core-client.md)). Use `max_scans_per_process=1`, one bridge per tenant or trust domain, or your own `CoreClient` if that residual risk is not acceptable.
 - **Bridge limits, measured** (the [record](https://github.com/redact-secret/redact-secret-vault/blob/main/docs/research/qualification-python-persistence-0.1.0b3.md), section 4.10). The child's memory still held a copy of an input's secret after the scan, and one copy stayed through thousands of later scans, until the process exited; only `max_scans_per_process=1` leaves no live process holding it. One bridge serves a few hundred to a few thousand small scans per second (the measured range depends on the host's load) however many threads wait. The first scan after a start pays for the Node.js start-up, the core load, and hashing the core (the integrity pin). `timeout_s` is end to end: a caller that waits for the bridge longer than `timeout_s` gets `BRIDGE_TIMEOUT` and nothing is sent, so a queue longer than `timeout_s` fails closed. The bridge refuses a core that is not the pinned release byte for byte (`CORE_INTEGRITY_MISMATCH`), and refuses an error code or field from the child that does not have its fixed shape (`BRIDGE_BAD_OUTPUT`); after repeated start failures it backs off (0.1 s to 5 s) and fails at once with the same code. The persistent server's scans run on two threads the bridge owns, not on the loop's default executor. Inputs near the 64 MiB ceiling can exceed the default `timeout_s` of 10 s.
-- **Default `max_scans_per_process` and the open decision.** The finding above was measured on core `0.1.0-beta.12` on Linux and was not re-measured on `0.1.0-beta.13` ([record, section 4.11](https://github.com/redact-secret/redact-secret-vault/blob/main/docs/research/qualification-python-persistence-0.1.0b3.md#411-re-run-of-2026-10-07-on-the-tree-of-main-at-49a2a07-version-010b5-core-010-beta13)); this page does not state it as confirmed for beta.13. Whether the bridge may be named qualified for the cells run with `max_scans_per_process=1` is the maintainer's decision and is pending ([#128](https://github.com/redact-secret/redact-secret-vault/issues/128)); until it is made, no claim is made for any bridge setting.
+- **Default `max_scans_per_process` and the open decision.** The finding above was measured on core `0.1.0-beta.12` on Linux and was re-run on `0.1.0-beta.13` in section 4.11 ([record, section 4.11](https://github.com/redact-secret/redact-secret-vault/blob/main/docs/research/qualification-python-persistence-0.1.0b3.md#411-re-run-of-2026-10-07-on-the-tree-of-main-at-49a2a07-version-010b5-core-010-beta13)); it was not re-run on `0.1.0-beta.14`, and this page does not state it as confirmed for beta.14. Whether the bridge may be named qualified for the cells run with `max_scans_per_process=1` is the maintainer's decision and is pending ([#128](https://github.com/redact-secret/redact-secret-vault/issues/128)); until it is made, no claim is made for any bridge setting.
 - **Not run in the record, so not stated:** the mixed-language forms of whole-request atomicity, create against fence, restart, process kill, and clock skew; the AWS KMS provider under the server-level leak run and under throttling; two hosts.
 - **Not tested, so not stated:** Windows, macOS in CI, free-threaded or PyPy builds, Python 3.14 and 3.10 for the persistent modules, a synchronous standby or failover, a connection pooler, managed PostgreSQL, two hosts, TLS, and power loss. Linux x86-64 ran only as a labeled subset under emulation, and in the GitHub-hosted jobs the record cites. The details are in the [qualification record](https://github.com/redact-secret/redact-secret-vault/blob/main/docs/research/qualification-python-persistence-0.1.0b3.md), which is the only document that may state support for a cell.
 - **Logging.** With a real key, `botocore` at `DEBUG` was observed writing the plaintext data key and the key ARN (`botocore.parsers`, the response body) and the wrapped key (`botocore.endpoint`, the request parameters). The KMS provider therefore fails closed without touching your logging configuration: at construction and before every KMS call it checks whether `DEBUG` is enabled (`Logger.isEnabledFor`, so inherited levels, the root logger, and `logging.disable` count) for `botocore`, `botocore.parsers`, `botocore.hooks`, `botocore.endpoint`, `boto3`, and `urllib3.connectionpool`. If it is, construction raises `KEY_INVALID_ARGUMENT` and a call raises `KEY_UNAVAILABLE` before any request is made. Pass `allow_sdk_debug_logging=True` only if you accept that the SDK **writes key material to your logs**; the provider then works as before. A cache hit makes no SDK call and is not refused. Not covered: a level raised while a call is in flight, a call abandoned by its timeout that is still running, a logger the SDK adds later, and a client you configured to log by another route. `psycopg` at `DEBUG` writes the host, port, user, and database of each connection, never a statement or a value.
