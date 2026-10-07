@@ -45,8 +45,24 @@ if [ "${RSV_IN_CONTAINER:-}" = "1" ]; then
     cd /work/repo
     [ -d node_modules ] || npm ci
     npm run build
-    # The official installer: a static binary, so the same uv works in every image of the matrix.
-    [ -x /work/tools/bin/uv ] || curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/work/tools/bin UV_NO_MODIFY_PATH=1 sh
+    # A pinned release of uv, a static binary, so the same uv works in every image of the
+    # matrix. The archive is checked against a SHA-256 recorded here before anything runs.
+    if [ ! -x /work/tools/bin/uv ]; then
+      uv_version=0.12.23
+      case "$(uname -m)" in
+        x86_64) uv_arch=x86_64; uv_sha=1cff8783850e794470aadb73f54b749542a511fc57b0ce6468b64bd3852e0ade ;;
+        aarch64 | arm64) uv_arch=aarch64; uv_sha=b536543cc4d50661986b165c76ee8aa9056e4fa332edcd153ff2e98760f9359b ;;
+        *) echo "no pinned uv for $(uname -m)" >&2; exit 1 ;;
+      esac
+      uv_dir=$(mktemp -d)
+      curl -fsSL -o "$uv_dir/uv.tar.gz" \
+        "https://github.com/astral-sh/uv/releases/download/$uv_version/uv-$uv_arch-unknown-linux-musl.tar.gz"
+      echo "$uv_sha  $uv_dir/uv.tar.gz" | sha256sum -c -
+      mkdir -p /work/tools/bin
+      tar -xzf "$uv_dir/uv.tar.gz" -C "$uv_dir"
+      install -m 0755 "$uv_dir/uv-$uv_arch-unknown-linux-musl/uv" /work/tools/bin/uv
+      rm -rf "$uv_dir"
+    fi
     for v in 3.11 3.12 3.13; do
       if [ ! -d "/work/venvs/py$v" ]; then
         /work/tools/bin/uv venv --quiet --python "$v" "/work/venvs/py$v"
