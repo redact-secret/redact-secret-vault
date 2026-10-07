@@ -80,3 +80,4 @@ Documentation drift found: `ARCHITECTURE.md` still says alpha and "persistence i
 - 2026-10-01: #118 merged (`5e088d3`). Issues #104 to #111, #20, #113, #114, #115 closed with evidence comments. Follow-ups filed: Python handoffs #119 to #129, SQLite adapter #130, clockless-store contract revision #131. Epic #4, release issue #112, and redact-secret/redact-secret#1002 updated.
 - 2026-10-01: remaining work is the release under #112: maintainer confirmation, the manual first publish of the six new packages, then tag `v0.1.0-beta.4`.
 - 2026-10-02: `v0.1.0-beta.4` tagged and published; the seven alpha packages had been published by hand; registry verification recorded; this record archived.
+- 2026-10-07: #130 CI matrix (`sqlite` job, Node.js 20/22/24, ubuntu and macOS) passed on `main` at `43ce6d9`; recorded in section 2.1 of the store-sqlite record. Power-loss simulation still NOT RUN; #130 stays open.

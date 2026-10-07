@@ -1,6 +1,6 @@
 # Qualification record: `@redact-secret/store-sqlite` 0.1.0-alpha.1
 
-**Status: partial, and the profile is not supported.** This record covers [#130](https://github.com/redact-secret/redact-secret-vault/issues/130), the `sqlite-local-wal` profile of the [backend research](persistent-backend-capabilities.md) (section 8.1). Run on 2026-10-01 on one machine. The package was published as `0.1.0-alpha.1` on 2026-10-02 (dist-tag `alpha`), after this record's runs; the registry tarball was not run through these gates. **The power-loss simulation required by the issue was not run, and the Node.js 20 run, the better-sqlite3 runs on Node.js 20, 24, and 25, and every Linux run have not happened.** Nothing here is a support claim. A profile is supported only when a record says every gate was run and passed; this one says otherwise.
+**Status: partial, and the profile is not supported.** This record covers [#130](https://github.com/redact-secret/redact-secret-vault/issues/130), the `sqlite-local-wal` profile of the [backend research](persistent-backend-capabilities.md) (section 8.1). Run on 2026-10-01 on one machine. The package was published as `0.1.0-alpha.1` on 2026-10-02 (dist-tag `alpha`), after this record's runs; the registry tarball was not run through these gates. **The power-loss simulation required by the issue was not run.** The 2026-10-01 local runs covered macOS only; the CI matrix (Node.js 20, 22, and 24 on Linux and macOS) was run afterwards and is recorded in [section 2.1](#21-ci-matrix-run-2026-10-07). Other cells remain unrun, as section 2 lists. Nothing here is a support claim. A profile is supported only when a record says every gate was run and passed; this one says otherwise.
 
 ## 1. Gates of the issue
 
@@ -33,9 +33,26 @@
 | `npm run check:persistence-boundaries`, `npm run qualify:persistence` | Same | 22.16.0 | Passed (PostgreSQL consumer not run: no database configured). The default run installs no driver; with `RSV_QUALIFY_BETTER_SQLITE3=1` the flow ran over `better-sqlite3`, and on 24.21.0 over `node:sqlite` |
 | Root `npm ci` | Same | 22.16.0 | Installs no `better-sqlite3` or `prebuild-install`: neither is in the root lockfile or `node_modules` |
 | `npm run build`, `npm run lint`, `npm run check:boundaries`, `npm run check:links` | Same | 22.16.0 | Passed |
-| `ci` job `sqlite node {20,22,24} ({ubuntu,macos}-latest)` | **Defined, not run.** No branch containing it has been pushed | 20, 22, 24 | Not run |
+| `ci` job `sqlite node {20,22,24} ({ubuntu,macos}-latest)` | **Run later, see section 2.1.** Not run when this table was written (2026-10-01) | 20, 22, 24 | See section 2.1 |
 
 **Not run, for any gate:** Node.js 20; `better-sqlite3` on Node.js 24, 25, and 20; `node:sqlite` on any Node.js release not listed above; Linux; any file system but the local macOS volume; `journal_mode=DELETE` beyond a startup check and one create (the profile is accepted by the code, and no gate ran on it); SQLite releases 3.44.6 and 3.50.7 (the version rule is unit-tested as a function); `better-sqlite3` 13; Windows; a network file system (rejected by the research, not tried); a slow or lying storage device; checkpoint starvation and WAL growth under long readers; a database larger than a few hundred megabytes; a host clock set back.
+
+### 2.1 CI matrix run, 2026-10-07
+
+The `sqlite` job of `ci.yml` ran on `main` at commit `43ce6d9` (push run [37632229349](https://github.com/redact-secret/redact-secret-vault/actions/runs/37632229349)), on GitHub-hosted runners (`ubuntu-24.04`, `macos-26-arm64`). The package under test is the working tree, version `0.1.0-alpha.1`; the code is unchanged since the local runs above apart from release-version bumps of other packages. Each job runs `npm run test:sqlite` and then `npm run qualify:persistence` (PostgreSQL consumer not run: no database configured).
+
+| Cell | Drivers run | `npm run test:sqlite` | Consumer qualification (Node.js) | Job result |
+| --- | --- | --- | --- | --- |
+| Node.js 20, ubuntu-latest | `better-sqlite3` only (`node:sqlite` does not exist on 20) | 272 tests, 261 passed, 0 failed, 11 skipped | passed, v20.20.2 | success |
+| Node.js 20, macos-latest | `better-sqlite3` only | 272 tests, 261 passed, 0 failed, 11 skipped | passed, v20.20.2 | success |
+| Node.js 22, ubuntu-latest | `better-sqlite3`, `node:sqlite` | 489 tests, 467 passed, 0 failed, 22 skipped | passed, v22.23.3 | success |
+| Node.js 22, macos-latest | `better-sqlite3`, `node:sqlite` | 489 tests, 467 passed, 0 failed, 22 skipped | passed, v22.23.2 | success |
+| Node.js 24, ubuntu-latest | `better-sqlite3`, `node:sqlite` | 489 tests, 467 passed, 0 failed, 22 skipped | passed, v24.21.0 | success |
+| Node.js 24, macos-latest | `better-sqlite3`, `node:sqlite` | 489 tests, 467 passed, 0 failed, 22 skipped | passed, v24.20.0 | success |
+
+The skip counts are 11 per driver (the documented host-clock cases of section 1), the same as the local runs; this record did not re-inspect each skip reason in the CI logs beyond the equal counts. SQLite versions per cell were not extracted from the logs for this record. The CI run uses the `better-sqlite3` version pinned in `qualification/sqlite-driver`.
+
+Earlier history: the first run of this job (2026-10-01, run 36936275172) failed on both Node.js 20 cells after about two minutes each and was fixed afterwards; that failure was not re-investigated here. A single `sqlite node 20 (ubuntu-latest)` job that timed out after 46 minutes was reported, but no such run is among the `ci.yml` runs still visible in the repository's run list, and none of the six jobs above took more than about four minutes (Node.js 20 is the slowest: about 3.7 minutes). A hang was therefore not reproduced and its cause is unknown; a recurrence should be investigated from its log, and the job had no `timeout-minutes` (GitHub's default is six hours). This change sets `timeout-minutes: 20` on the job so that a hang fails fast and leaves a log.
 
 ## 3. Limits measured
 
@@ -65,7 +82,7 @@
 ## 5. Remaining before this profile can be called qualified
 
 1. A power-loss simulation at the block device, with its method and result recorded. Until then, the durability declaration is documentation-based.
-2. The `sqlite` CI job run on Node.js 20, 22, and 24 on Linux and macOS, and its result recorded here.
+2. ~~The `sqlite` CI job on Node.js 20, 22, and 24 on Linux and macOS~~ Done, see section 2.1. Still open: SQLite versions per cell, and a tarball from the registry run through the gates.
 3. `sqlite3_rsync` and the SQLite backports, if the profile is to name them.
 4. A decision on whether `journal_mode=DELETE` with `synchronous=EXTRA` is offered: the code accepts it, and the gates above did not run on it.
 5. The independent review that every persistence package still needs ([#112](https://github.com/redact-secret/redact-secret-vault/issues/112)), and first publication.
