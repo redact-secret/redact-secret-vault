@@ -161,6 +161,30 @@ jobs:
           path: .qualification/reports/
           if-no-files-found: error
 
+  # Full Chromium + Firefox + WebKit dedicated-Worker qualification (#14, #164).
+  # Kept apart from `browser` so Worker-mode and main-thread evidence stay
+  # separate. Pull requests run Chromium only (ci.yml); a release runs all three.
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run qualify:worker
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: release-reports-worker
+          path: .qualification/reports/
+          if-no-files-found: error
+
   # Publishes with npm trusted publishing (OIDC): no long-lived npm token, an
   # `id-token: write` grant scoped to this job only, and `--provenance` for a
   # signed build provenance attestation. Requires a trusted publisher
@@ -171,7 +195,7 @@ jobs:
   # fall back to a token. The vault is published before the vault-server,
   # which depends on it at an exact version.
   publish:
-    needs: [boundaries, vault-server, node, browser, persistence, postgres, sqlite]
+    needs: [boundaries, vault-server, node, browser, worker, persistence, postgres, sqlite]
     runs-on: ubuntu-latest
     permissions:
       contents: read

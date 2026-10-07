@@ -209,8 +209,21 @@ jobs:
         env:
           RSV_QUALIFY_BETTER_SQLITE3: "1"
 
+  # Two-tier real-browser qualification (#164). The job name stays `browser`
+  # because branch protection requires that exact check name.
+  #   pull_request:                 Chromium only (the fast required gate).
+  #   push to main, workflow_dispatch: Chromium + Firefox + WebKit.
+  # The tag-time release workflow runs the full set as well (release.yml).
+  # Browser mode and Worker mode stay separate jobs with separate reports and
+  # artifacts, so a Worker regression cannot pass as a main-thread pass. They
+  # install the engines twice; that cost is accepted because the three-engine
+  # install only happens off the PR path, and separate jobs keep failure
+  # isolation and run in parallel.
   browser:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BROWSERS: ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium,firefox,webkit' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -220,7 +233,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright install --with-deps ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium firefox webkit' }}
       - run: npm run qualify:browser
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -232,8 +245,13 @@ jobs:
   # Optional dedicated-Worker mode (#14): separately qualified evidence, kept
   # apart from the `browser` job above so a Worker-mode regression cannot be
   # mistaken for a main-thread regression, or vice versa (Gate V).
+  # Same two-tier cadence as `browser`: Chromium on pull requests, all three
+  # engines on push to main and workflow_dispatch.
   worker:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BROWSERS: ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium,firefox,webkit' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -243,7 +261,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright install --with-deps ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium firefox webkit' }}
       - run: npm run qualify:worker
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
