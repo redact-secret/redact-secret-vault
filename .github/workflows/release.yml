@@ -189,9 +189,14 @@ jobs:
       # Trusted publishing (OIDC) requires npm CLI >= 11.5.1; the runners'
       # bundled npm may be older. Pinned (not @latest) so this step installs
       # a known version rather than whatever the registry resolves at
-      # run time; bump deliberately.
+      # run time; bump deliberately. Installed from tools/npm-cli with `npm ci`,
+      # so the version and its integrity come from a committed lockfile, and
+      # put first on PATH for the steps that follow.
       - name: Ensure npm supports trusted publishing
-        run: npm install -g npm@12.1.0
+        run: |
+          npm ci --prefix tools/npm-cli --ignore-scripts
+          echo "$GITHUB_WORKSPACE/tools/npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          "$GITHUB_WORKSPACE/tools/npm-cli/node_modules/.bin/npm" --version
       - run: npm run build
 
       # Every README published below links to this tag's documentation, not to
@@ -329,7 +334,9 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[test,lint,crypto]"
+      - run: |
+          pip install --require-hashes -r requirements/release-test.txt
+          pip install --no-deps -e .
         working-directory: packages/vault-py
       - run: ruff check .
         working-directory: packages/vault-py
@@ -357,7 +364,7 @@ jobs:
       # deliberately. (The build backend, hatchling, is resolved by `build`'s
       # isolated environment from pyproject.toml's [build-system].)
       - name: Install build tooling
-        run: python -m pip install build==1.6.1 twine==7.0.0
+        run: python -m pip install --require-hashes -r packages/vault-py/requirements/build-tools.txt
       - name: Build sdist and wheel
         working-directory: packages/vault-py
         run: python -m build

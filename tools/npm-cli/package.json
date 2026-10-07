@@ -1,0 +1,9 @@
+{
+  "name": "rsv-release-npm-cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pins the npm CLI that release.yml publishes with (trusted publishing needs npm >= 11.5.1). Installed with `npm ci`, so the tarball integrity is locked.",
+  "dependencies": {
+    "npm": "12.1.0"
+  }
+}

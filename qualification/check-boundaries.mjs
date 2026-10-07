@@ -123,7 +123,7 @@ if (js.includes("capture-plan.js")) {
       check(!/capture-plan/.test(entrySrc), `dist/${entry}${ext} names the capture-plan module`);
       check(!/export\s*\*/.test(entrySrc), `dist/${entry}${ext} has a star export`);
       for (const name of internalNames) {
-        check(!new RegExp(`\\b${name.replace(/\$/g, "\\$")}\\b`).test(entrySrc), `dist/${entry}${ext} exposes internal ${name}`);
+        check(!new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(entrySrc), `dist/${entry}${ext} exposes internal ${name}`);
       }
     }
   }
