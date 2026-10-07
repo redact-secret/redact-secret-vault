@@ -180,6 +180,8 @@ jobs:
   sqlite:
     name: sqlite node ${{ matrix.node }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Every cell finished in under 5 minutes on 2026-10-07; a hang should fail fast, not run to the 6-hour default.
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
