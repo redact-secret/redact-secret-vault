@@ -7,6 +7,7 @@ import { after, describe, test } from "node:test";
 import { StoreError } from "@redact-secret/vault-contracts";
 
 import { openSqliteStore } from "../dist/store.js";
+import { writeMarker } from "../dist/deployment.js";
 import { initialized, randomAttemptId, randomNamespace, rawCapture, rawCommit } from "../support/fixtures.mjs";
 import { driver, BUSY_MS, Database, freshDatabase, sql } from "./helpers.mjs";
 
@@ -247,6 +248,66 @@ describe("transactions", () => {
     store.close();
     await assert.rejects(store.createCapture(input), (thrown) => thrown.code === "STORE_CLOSED");
     await assert.rejects(store.readCaptures({ scope: input.scope, captureIds: [input.capture.captureId] }), (thrown) => thrown.code === "STORE_CLOSED");
+  });
+
+  test("a WAL writer advancing the marker after a read snapshot does not falsely quarantine it", async () => {
+    const database = await fresh();
+    const writer = new Database(database.filename);
+    let afterMeta;
+    const store = await openSqliteStore({ driver, filename: database.filename, busyTimeoutMs: BUSY_MS }, {
+      wrapConnection: (db) => ({
+        get inTransaction() { return db.inTransaction; },
+        prepare(text) {
+          const statement = db.prepare(text);
+          if (text !== "SELECT database_id, counter FROM rsv_meta WHERE singleton = 1") return statement;
+          return {
+            get(...args) {
+              const row = statement.get(...args);
+              const action = afterMeta;
+              afterMeta = undefined;
+              action?.(row);
+              return row;
+            },
+            all: (...args) => statement.all(...args),
+            run: (...args) => statement.run(...args),
+          };
+        },
+        exec: (text) => db.exec(text),
+        close: () => db.close(),
+      }),
+    });
+    try {
+      const namespace = randomNamespace("marker-snapshot");
+      await initialized(store, namespace, 1);
+      const input = rawCapture({ namespace, entries: 1, maxUses: 2 });
+      assert.equal((await store.createCapture(input)).outcome, "created");
+      const pendingCommit = await rawCommit(store, input);
+      let interleavings = 0;
+      afterMeta = (row) => {
+        // A separate process has its own high-water map. Raw SQL plus its
+        // marker update models that writer without touching this process's map.
+        writer.exec("BEGIN IMMEDIATE");
+        writer.prepare("UPDATE rsv_capture SET state = 'revoked', generation = generation + 1 WHERE namespace = ? AND capture_id = ?")
+          .run(namespace, input.capture.captureId);
+        writer.exec("UPDATE rsv_meta SET counter = counter + 1 WHERE singleton = 1");
+        writer.exec("COMMIT");
+        writeMarker(`${database.filename}.rsv-marker`, { databaseId: row.database_id, counter: row.counter + 1 });
+        interleavings += 1;
+      };
+      const request = { scope: input.scope, entryIds: input.entries.map((entry) => entry.entryId) };
+      const snapshot = await store.readEntries(request);
+      assert.equal(interleavings, 1, "writer committed between the reader's metadata snapshot and marker comparison");
+      assert.equal(snapshot.recovery.state, "serving");
+      assert.equal(snapshot.captures[0].state, "live", "the read remains one coherent old snapshot");
+      const current = await store.readEntries(request);
+      assert.equal(current.recovery.state, "serving");
+      assert.equal(current.captures[0].state, "revoked");
+      assert.deepEqual(await store.commitRestore(pendingCommit), { outcome: "rejected", reason: "revoked" });
+      assert.equal(sql(database.filename, "SELECT used FROM rsv_entry WHERE entry_id = ?", input.entries[0].entryId)[0].used, 0);
+    } finally {
+      writer.close();
+      store.close();
+    }
   });
 
   test("a read transaction is one snapshot: entries and their captures come from the same moment", async () => {

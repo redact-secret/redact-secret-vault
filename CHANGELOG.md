@@ -4,6 +4,8 @@
 
 ### JavaScript
 
+- `@redact-secret/store-sqlite`: sample the recovery marker before opening read snapshots so a concurrent WAL writer does not falsely quarantine a valid older snapshot. Write transactions still validate the current marker under the writer lock; a deterministic regression test verifies revocation remains enforced at commit.
+
 - [#166](https://github.com/redact-secret/redact-secret-vault/issues/166): add `vault-interop-v1` bulk capture and preflight/consume authority contracts and JavaScript reference APIs, versioned shared vectors, and a pinned real-Rust development roundtrip. Original `capture` and `restore` behavior remains unchanged. These additions are unreleased; no native Rust Vault or production pipe support is claimed.
 
 - `@redact-secret/key-provider-aws-kms` ([#145](https://github.com/redact-secret/redact-secret-vault/issues/145)): [finding](docs/research/aws-sdk-v3-logger-and-key-material.md) and a regression test. A `logger` in the AWS SDK v3 client configuration never receives the plaintext data key (`Plaintext` is marked sensitive); it does receive the key ARN, the wrapped key, and the context digest. No provider change.
