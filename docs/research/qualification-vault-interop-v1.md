@@ -12,6 +12,8 @@ Date: 2026-10-08. Scope: workspace, synthetic development reference qualificatio
 
 Run the exact commands in [qualification/interop/README.md](../../qualification/interop/README.md). Downloads/builds live in ignored `.qualification/interop/`; fixture code is tracked separately. There are no registry Rust dependencies or copied sibling implementations. The pipe calls each pinned engine's actual public trait, not a replacement engine.
 
+The packed Node.js 22.16.0 runtime qualification also passed its native-addon and WebAssembly lanes with PII off/on and activation scenarios after updating the exact public-surface guard for the new request-scoped APIs.
+
 ## Executed reference profiles
 
 The locally qualified development reference profile is one exclusive Node.js in-memory server authority and one Rust process, synthetic trusted host context, bounded whole-input capture, and structured-field restoration. The actual server principal resolver and current policy enforce tenant/principal, session, sink/path and purpose checks. Capture authorization remains trusted host responsibility, matching the existing server contract. The pipe transports synthetic source/values only, never a real credential.
