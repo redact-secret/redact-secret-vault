@@ -21,7 +21,15 @@ function validate(value, rule, path = "vectors") {
       Number.isInteger(value) ? "integer" : typeof value;
     assert.ok(types.includes(actual), `${path}: type`);
   }
-  if (rule.pattern) assert.ok(new RegExp(rule.pattern).test(value), `${path}: pattern`);
+  if (rule.pattern) {
+    const patterns = new Map([
+      ["^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$", /^[1-9][0-9]*\.[0-9]+\.[0-9]+$/],
+      ["^<rsv_[a-z2-7]{26}>$", /^<rsv_[a-z2-7]{26}>$/],
+    ]);
+    const pattern = patterns.get(rule.pattern);
+    assert.ok(pattern, `${path}: supported schema pattern`);
+    assert.ok(pattern.test(value), `${path}: pattern`);
+  }
   if (rule.minimum !== undefined && value !== null) assert.ok(value >= rule.minimum, `${path}: minimum`);
   if (Array.isArray(value)) {
     if (rule.minItems !== undefined) assert.ok(value.length >= rule.minItems, `${path}: minItems`);
