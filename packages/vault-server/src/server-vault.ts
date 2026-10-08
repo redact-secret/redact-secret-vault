@@ -1,6 +1,7 @@
 import { createVault, DEFAULT_LIMITS, VaultError } from "@redact-secret/vault";
-import type { CaptureResult, ReleaseGrant, RestoreRequest, RestoreResult, Vault } from "@redact-secret/vault";
+import type { CaptureResult, CaptureOccurrence, OccurrenceCaptureOptions, OccurrenceCaptureResult, ReleaseGrant, RestoreRequest, RestoreResult, Vault } from "@redact-secret/vault";
 
+import { snapshotCaptureOccurrences, snapshotOccurrenceOptions } from "./capture-input.js";
 import { VaultServerError } from "./errors.js";
 import { countMatches, MARKER_PATTERN, TOKEN_PATTERN } from "./token-pattern.js";
 import type {
@@ -12,6 +13,7 @@ import type {
   ServerAuditHook,
   ServerAuditOperation,
   ServerCaptureOptions,
+  ServerOccurrenceCaptureOptions,
   ServerDenialReason,
   ServerReleasePolicy,
   ServerRestoreRequest,
@@ -217,6 +219,7 @@ export async function createServerVault<Context = unknown>(
     resolvedRevocationMemoryMs,
     resolvedResolverTimeout,
     resolvedPolicyTimeout,
+    Math.min(limits?.maxEntries ?? DEFAULT_LIMITS.maxEntries, limits?.maxFindings ?? DEFAULT_LIMITS.maxFindings),
   );
 }
 
@@ -232,6 +235,7 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
   readonly #onAudit: ServerAuditHook | undefined;
   readonly #policyRevision: string | (() => string) | undefined;
   readonly #maxRestoreFields: number;
+  readonly #maxCaptureOccurrences: number;
   readonly #maxRestoreFieldBytes: number;
   readonly #revocationMemoryMs: number;
   readonly #resolverTimeoutMs: number;
@@ -277,8 +281,10 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
     revocationMemoryMs: number,
     resolverTimeoutMs: number,
     policyTimeoutMs: number,
+    maxCaptureOccurrences: number,
   ) {
     this.#vault = vault;
+    this.#maxCaptureOccurrences = maxCaptureOccurrences;
     this.#clock = clock;
     this.#resolvePrincipal = resolvePrincipal;
     this.#policy = policy;
@@ -292,11 +298,33 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
   }
 
   capture(input: string, options: ServerCaptureOptions): Promise<CaptureResult> {
-    return this.#run(() => this.#capture(input, options));
+    return this.#run(() => this.#capture(input, options)).catch((error) => {
+      throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION");
+    });
+  }
+
+  async captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: ServerOccurrenceCaptureOptions): Promise<OccurrenceCaptureResult> {
+    const snapshot = snapshotCaptureOccurrences(occurrences, this.#maxCaptureOccurrences);
+    const captureOptions = snapshotOccurrenceOptions(options);
+    return this.#run(() => this.#capture(input, captureOptions, snapshot)).catch((error) => {
+      throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION");
+    }) as Promise<OccurrenceCaptureResult>;
   }
 
   restore(request: ServerRestoreRequest<Context>): Promise<ServerRestoreResult> {
     return this.#run(() => this.#restore(request));
+  }
+
+  preflightRestore(request: ServerRestoreRequest<Context>): Promise<void> {
+    return this.#run(async () => { await this.#restore(request, "preflight"); }).catch((error) => {
+      throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION");
+    });
+  }
+
+  consumeRestore(request: ServerRestoreRequest<Context>): Promise<ServerRestoreResult & { readonly values: readonly string[] }> {
+    return this.#run(() => this.#restore(request, "consume")).catch((error) => {
+      throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION");
+    }) as Promise<ServerRestoreResult & { readonly values: readonly string[] }>;
   }
 
   revoke(captureId: string): Promise<number> {
@@ -326,7 +354,7 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
     return run;
   }
 
-  async #capture(input: string, options: ServerCaptureOptions): Promise<CaptureResult> {
+  async #capture(input: string, options: ServerCaptureOptions | ServerOccurrenceCaptureOptions, occurrences?: readonly CaptureOccurrence[]): Promise<CaptureResult> {
     if (typeof options !== "object" || options === null) throw new VaultServerError("INVALID_ARGUMENT");
     const { issuedTenant, ...captureOptions } = options;
     if (!isIdentifier(issuedTenant)) throw new VaultServerError("INVALID_ARGUMENT");
@@ -335,9 +363,16 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
     this.#sweepShadow(at);
     this.#sweepTombstones(at);
 
+    // Resolve callback-owned metadata before retaining anything.
+    const grants = shadowGrants(captureOptions.release);
+    const maxUses = captureOptions.maxUses ?? 1;
+    const revision =
+      typeof this.#policyRevision === "function" ? this.#policyRevision() : this.#policyRevision;
     let result: CaptureResult;
     try {
-      result = this.#vault.capture(input, captureOptions);
+      result = occurrences === undefined
+        ? this.#vault.capture(input, captureOptions)
+        : this.#vault.captureOccurrences(input, occurrences, captureOptions as OccurrenceCaptureOptions);
     } catch (thrown) {
       if (thrown instanceof VaultError) {
         if (thrown.code === "DISPOSED") {
@@ -349,10 +384,6 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
       throw new VaultServerError("INVARIANT_VIOLATION");
     }
 
-    const grants = shadowGrants(captureOptions.release);
-    const maxUses = captureOptions.maxUses ?? 1;
-    const revision =
-      typeof this.#policyRevision === "function" ? this.#policyRevision() : this.#policyRevision;
     const tokens = new Set<string>();
     for (const issued of result.tokens) {
       this.#shadow.set(issued.token, {
@@ -371,7 +402,7 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
     return result;
   }
 
-  async #restore(request: ServerRestoreRequest<Context>): Promise<ServerRestoreResult> {
+  async #restore(request: ServerRestoreRequest<Context>, mode: "restore" | "preflight" | "consume" = "restore"): Promise<ServerRestoreResult & { readonly values?: readonly string[] }> {
     if (typeof request !== "object" || request === null) throw new VaultServerError("INVALID_ARGUMENT");
     const { context, sink, purpose, captures, fields, sessionId, requestId } = request;
     const tenantOverride = request.tenant;
@@ -551,6 +582,12 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
       }
     }
 
+    const trustedFields = Object.fromEntries(snapshot);
+    if (mode === "preflight") {
+      this.#vault.preflightRestore({ sink, captures: [...sources], fields: trustedFields });
+      return { fields: {}, restored: 0, principalId: principal.id, tenant };
+    }
+
     // Commit: the wrapped vault is the sole source of truth for token →
     // value substitution and for atomically consuming budget at its own
     // linearization point (F4). Every check above already passed against
@@ -558,9 +595,10 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
     // capture, same clock) and under this instance's own single-flight
     // queue, so this call re-validating and succeeding is expected, not
     // merely hoped for.
-    let result: RestoreResult;
+    let result: RestoreResult & { readonly values?: readonly string[] };
     try {
-      result = this.#vault.restore({ sink, captures: [...sources], fields } satisfies RestoreRequest);
+      const coreRequest = { sink, captures: [...sources], fields: trustedFields } satisfies RestoreRequest;
+      result = mode === "consume" ? this.#vault.consumeRestore(coreRequest) : this.#vault.restore(coreRequest);
     } catch {
       // A denial here despite our preflight passing means the shadow and
       // the wrapped vault have drifted — a bug in this package, not a
@@ -596,7 +634,7 @@ class ServerVaultImpl<Context> implements ServerVault<Context> {
       entries: uses.size,
       ...(requestId === undefined ? {} : { requestId }),
     });
-    return { fields: result.fields, restored: result.restored, principalId: principal.id, tenant };
+    return { fields: result.fields, restored: result.restored, principalId: principal.id, tenant, ...(mode === "consume" ? { values: result.values } : {}) };
   }
 
   async #revoke(captureId: string): Promise<number> {

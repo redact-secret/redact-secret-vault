@@ -71,6 +71,9 @@ The persistent profile is built from smaller packages you only meet in that guid
 
 ## Documentation
 
+- [Anonymizer/Vault/restore interoperability](docs/specs/vault-interop.md): ownership, accepted contracts and the qualified development reference path.
+
+
 - Something failed? [Troubleshooting](docs/guides/troubleshooting.md) lists every error code with its fix.
 - [Examples](examples/README.md) you can run as they are.
 - Guides: [Worker mode](docs/guides/worker-mode.md), [PII findings](docs/guides/pii.md), [persistent server](docs/guides/persistent-server.md).

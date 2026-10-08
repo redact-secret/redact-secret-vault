@@ -1,0 +1,9 @@
+[package]
+name = "vault-interop-qualification"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anonymizer = { path = "../../../.qualification/interop/siblings/anonymizer", features = ["reversible"] }
+redact-secret-restore = { path = "../../../.qualification/interop/siblings/restore" }

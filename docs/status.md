@@ -53,3 +53,16 @@ A server may use the default in-memory vault; `vault-server` and in-memory stora
 ## Proposed delivery
 
 Define shared security and conformance contracts first. Qualify `@redact-secret/vault` for browser and Node.js memory use, then qualify server authorization, including Python as an early target — `packages/vault-py` is that initial, research-grade Python implementation, still gated on its own conformance evidence and the boundary qualification gaps its research doc names. Rust and Go support follow available core integration and measured demand; do not reimplement detectors here. Each language/runtime is supported only after its own threat model and tests. Persistence follows the same rule: one backend and two topologies are qualified, and each further backend, key provider, or language needs its own record. Release dates remain open.
+
+## Forward/reverse sibling interoperability
+
+The accepted revision is [vault-interop-v1](specs/vault-interop.md), with vectors `1.0.0`. These API additions are on main and unreleased; existing package/runtime release claims above do not imply an interop release.
+
+| Profile | Contract and adapter | Local/cross-language evidence | Production status |
+| --- | --- | --- | --- |
+| JavaScript portable/in-memory server | Specified; bulk capture and preflight/consume implemented | Unit/vector tests; actual pinned Rust engines through private synthetic pipe | Existing JS support unchanged; pipe is development-only |
+| JavaScript persistent authority | Specified; same batch transaction and ciphertext-only creation | Memory-backed fault/interop tests; PostgreSQL roundtrip in the existing CI job | Existing named PostgreSQL qualification unchanged; no new durability claim |
+| Rust native host adapter | Native TokenSink/RestoreAuthority contract specified | Both real engines consume contract through reference pipe; shared token vectors | No native Rust Vault implementation or production adapter qualified |
+| Python | Existing APIs mapped; no new bulk adapter | Shared token vectors consumed; no bulk authority compatibility claim | Existing Python scope unchanged |
+
+The [qualification record](research/qualification-vault-interop-v1.md) names exact revisions, runtimes, copies/lifetimes, cases and measured integration overhead. Token parity is not authority qualification. Browser Worker bulk capture, service/FFI protocols, Go and crash-resilient staged transactions remain unsupported by this revision's reference adapters.

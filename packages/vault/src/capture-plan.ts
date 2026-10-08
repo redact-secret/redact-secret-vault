@@ -19,6 +19,7 @@ import type {
   SecretFinding,
 } from "@redact-secret/core";
 
+import { planOccurrences } from "./capture-occurrences.js";
 import { activateCore, installedCore } from "./core-module.js";
 import type { CoreModule } from "./core-module.js";
 import { coreCodeOf, VaultError } from "./errors.js";
@@ -37,7 +38,7 @@ import {
   resolveRandomFill,
 } from "./token.js";
 import type { RandomFill } from "./token.js";
-import type { CaptureOptions, VaultLimits, VaultOptions } from "./types.js";
+import type { CaptureOptions, CaptureOccurrence, OccurrenceCaptureOptions, VaultLimits, VaultOptions } from "./types.js";
 
 export const DEFAULT_LIMITS: Readonly<VaultLimits> = Object.freeze({
   maxEntries: 256,
@@ -150,7 +151,7 @@ export function acquirePlanRandom(): PlanRandom {
   return handle;
 }
 
-function fillOf(random: PlanRandom): RandomFill {
+export function fillOf(random: PlanRandom): RandomFill {
   const fill = randomSources.get(random);
   if (fill === undefined) throw new VaultError("INVALID_ARGUMENT");
   return fill;
@@ -214,7 +215,7 @@ export function resolveCaptureLimits(partial: Partial<VaultLimits> | undefined):
   return Object.freeze(resolved) as unknown as VaultLimits;
 }
 
-function resolveGrants(release: unknown): Map<string, Set<string>> {
+export function resolveGrants(release: unknown): Map<string, Set<string>> {
   if (!Array.isArray(release) || release.length === 0 || release.length > MAX_GRANTS) {
     throw new VaultError("INVALID_ARGUMENT");
   }
@@ -236,7 +237,7 @@ function resolveGrants(release: unknown): Map<string, Set<string>> {
   return grants;
 }
 
-function issueToken(
+export function issueToken(
   fill: RandomFill,
   staged: ReadonlySet<string>,
   isTaken: ((token: string) => boolean) | undefined,
@@ -516,6 +517,7 @@ export interface CapturePlanner {
   readonly piiActivation: string | null;
   /** `planCapture` with nothing already held and no live tokens to avoid. */
   plan(input: string, options: CaptureOptions, limits: VaultLimits): CapturePlan;
+  planOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: OccurrenceCaptureOptions, limits: VaultLimits): CapturePlan & { readonly occurrenceIds: readonly string[] };
   /** A fresh capture identifier; see `newPlannedCaptureId`. */
   newCaptureId(): string;
 }
@@ -555,6 +557,8 @@ export async function openCapturePlannerFor(
     piiActivation,
     plan: (input: string, capture: CaptureOptions, limits: VaultLimits): CapturePlan =>
       planCaptureWith(core, piiActive, input, capture, limits, { random, budget: held }),
+    planOccurrences: (input: string, occurrences: readonly CaptureOccurrence[], capture: OccurrenceCaptureOptions, limits: VaultLimits) =>
+      planOccurrences(input, occurrences, capture, limits, { random, budget: held }),
     newCaptureId: (): string => newCaptureIdFrom(random),
   });
 }

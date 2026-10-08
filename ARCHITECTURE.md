@@ -128,3 +128,25 @@ This repository versions independently from the core and adapters. Each language
 - Real-core integration at the declared dependency range endpoints.
 
 See [Decisions](docs/decisions/README.md) for settled boundaries and open questions.
+
+## Forward and reverse sibling boundary
+
+```text
+redact-secret / fastner / caller findings
+                  |
+                  v
+              anonymizer
+                  | bulk reversible capture
+                  v
+                Vault
+                  | preflight / consume authority
+                  v
+               restore
+                  |
+                  v
+          trusted destination
+```
+
+Anonymizer owns finding composition, arbitration, replacement planning and forward construction. Vault owns token identity, original retention, grants/authorization, expiry/revocation/use budgets, persistence and crypto. Restore owns token discovery, RestorePlan, authority interaction and reconstruction. Detection remains upstream; the host supplies finalized trusted findings and must not omit a blocked finding. No sibling receives an arbitrary mapping export.
+
+The [vault-interop-v1 contract](docs/specs/vault-interop.md) is language-neutral. JavaScript implements bounded bulk capture and preflight/consume surfaces. Consumer-owned Rust traits are the native distribution boundary; no native Rust Vault engine ships. The [development reference pipe](qualification/interop/README.md) is optional qualification infrastructure, not required architecture. [Support and exact evidence](docs/research/qualification-vault-interop-v1.md) distinguish specified contracts, implemented adapters, local checks, cross-language conformance and production profiles.

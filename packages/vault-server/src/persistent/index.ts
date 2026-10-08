@@ -16,6 +16,8 @@ export type {
   LifecyclePolicy,
   LifecycleRequest,
   PersistentCaptureOptions,
+  PersistentOccurrenceCaptureOptions,
+  PersistentOccurrenceCaptureResult,
   PersistentCaptureResult,
   PersistentRestoreRequest,
   PersistentRestoreResult,

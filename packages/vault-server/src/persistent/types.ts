@@ -1,4 +1,4 @@
-import type { CaptureOptions, IssuedToken, VaultLimits, VaultOptions } from "@redact-secret/vault";
+import type { CaptureOptions, CaptureOccurrence, OccurrenceCaptureOptions, OccurrenceIssuedToken, IssuedToken, VaultLimits, VaultOptions } from "@redact-secret/vault";
 import type { RecordCrypto, Store, StoreCapabilities } from "@redact-secret/vault-contracts";
 
 import type { Principal, PrincipalResolver, ServerAuditHook, ServerReleasePolicy } from "../types.js";
@@ -173,7 +173,10 @@ export interface PersistentServerVault<Context = unknown> {
   /** The capabilities the store declared when this instance was created. */
   readonly storeCapabilities: StoreCapabilities;
   capture(input: string, options: PersistentCaptureOptions<Context>): Promise<PersistentCaptureResult>;
+  captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: PersistentOccurrenceCaptureOptions<Context>): Promise<PersistentOccurrenceCaptureResult>;
   restore(request: PersistentRestoreRequest<Context>): Promise<PersistentRestoreResult>;
+  preflightRestore(request: PersistentRestoreRequest<Context>): Promise<void>;
+  consumeRestore(request: PersistentRestoreRequest<Context>): Promise<PersistentRestoreResult & { readonly values: readonly string[] }>;
   /** Denies future restores of one capture. Does not delete ciphertext. */
   revoke(request: LifecycleRequest<Context>): Promise<RevokeResult>;
   /** Revokes, then deletes the capture's ciphertext from the live store. Not erasure. */
@@ -182,4 +185,12 @@ export interface PersistentServerVault<Context = unknown> {
   resolveAttempt(request: ResolveAttemptRequest<Context>): Promise<ResolveAttemptResult>;
   /** Releases this instance. Revokes nothing, deletes nothing, and closes no store or provider. */
   close(): Promise<void>;
+}
+
+export interface PersistentOccurrenceCaptureOptions<Context = unknown> extends OccurrenceCaptureOptions {
+  readonly context: Context;
+  readonly requestId?: string;
+}
+export interface PersistentOccurrenceCaptureResult extends Omit<PersistentCaptureResult, "tokens"> {
+  readonly tokens: readonly OccurrenceIssuedToken[];
 }

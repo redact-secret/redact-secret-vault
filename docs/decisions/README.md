@@ -4,6 +4,9 @@ Decision records document durable product and security boundaries. Their status 
 
 | Record | Status | Question answered |
 | --- | --- | --- |
+| [Freeze bulk reversible capture](freeze-reversible-capture-contract.md) | Accepted, JavaScript reference implemented on main | How do finalized occurrences obtain Vault-issued identities without mapping export? |
+| [Adapt bulk restore authority](adapt-bulk-restore-authority.md) | Accepted, reference implemented on main | How does nonconsuming preflight lead to ordered committed values? |
+| [Choose native Rust interoperability boundary](native-rust-interop-boundary.md) | Accepted | How do Rust siblings consume one contract without mandatory IPC or a Vault clone? |
 | [Separate the reversible boundary](separate-reversible-boundary.md) | Accepted | Which repository owns retention and restoration? |
 | [Decouple typed placeholders from restoration](decouple-typed-placeholders-from-restoration.md) | Accepted (note added 2026-09-28 for core beta.10 PII types) | Does a typed label carry restore identity or authority? |
 | [Define restore authority and lifecycle](restore-authority-and-lifecycle.md) | Accepted principles; implementation open | Which checks are invariant, and which choices belong to the application? |

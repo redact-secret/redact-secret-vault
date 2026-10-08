@@ -1,7 +1,7 @@
 import { VaultError } from "@redact-secret/vault";
 import { openCapturePlanner, resolveCaptureLimits } from "@redact-secret/vault/internal/capture-plan";
 import type { CapturePlan, CapturePlanner } from "@redact-secret/vault/internal/capture-plan";
-import type { VaultLimits } from "@redact-secret/vault";
+import type { CaptureOccurrence, OccurrenceCaptureOptions, VaultLimits } from "@redact-secret/vault";
 import {
   isAttemptId,
   isCaptureId,
@@ -31,6 +31,7 @@ import type {
   StoredEntry,
 } from "@redact-secret/vault-contracts";
 
+import { snapshotCaptureOccurrences, snapshotOccurrenceOptions } from "../capture-input.js";
 import { VaultServerError } from "../errors.js";
 import type { ServerVaultErrorCode } from "../errors.js";
 import { countMatches, MARKER_PATTERN, TOKEN_PATTERN } from "../token-pattern.js";
@@ -52,6 +53,8 @@ import type {
   LifecyclePolicy,
   LifecycleRequest,
   PersistentCaptureOptions,
+  PersistentOccurrenceCaptureOptions,
+  PersistentOccurrenceCaptureResult,
   PersistentCaptureResult,
   PersistentRestoreRequest,
   PersistentRestoreResult,
@@ -404,6 +407,15 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
   // ---------------------------------------------------------------- capture
 
   async capture(input: string, options: PersistentCaptureOptions<Context>): Promise<PersistentCaptureResult> {
+    return this.#capture(input, options);
+  }
+
+  async captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: PersistentOccurrenceCaptureOptions<Context>): Promise<PersistentOccurrenceCaptureResult> {
+    const snapshot = snapshotCaptureOccurrences(occurrences, Math.min(this.#i.limits.maxFindings, this.#i.limits.maxEntries, this.#i.capabilities.maxCreateEntries));
+    return this.#capture(input, snapshotOccurrenceOptions(options), snapshot) as Promise<PersistentOccurrenceCaptureResult>;
+  }
+
+  async #capture(input: string, options: PersistentCaptureOptions<Context> | PersistentOccurrenceCaptureOptions<Context>, occurrences?: readonly CaptureOccurrence[]): Promise<PersistentCaptureResult> {
     this.#open();
     if (typeof input !== "string") throw new VaultServerError("INVALID_ARGUMENT");
     if (typeof options !== "object" || options === null) throw new VaultServerError("INVALID_ARGUMENT");
@@ -427,8 +439,14 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
     // The same capture gate the in-memory vault runs: block rejects, warn and
     // allow pass through only when asked, PII needs its exact-type allowlist.
     let plan: CapturePlan;
+    let occurrenceIds: readonly string[] | undefined;
     try {
-      plan = this.#i.planner.plan(input, captureOptions, this.#i.limits);
+      if (occurrences === undefined) plan = this.#i.planner.plan(input, captureOptions, this.#i.limits);
+      else {
+        const planned = this.#i.planner.planOccurrences(input, occurrences, captureOptions as OccurrenceCaptureOptions, this.#i.limits);
+        plan = planned;
+        occurrenceIds = planned.occurrenceIds;
+      }
     } catch (thrown) {
       if (thrown instanceof VaultError) return fail("VAULT_FAILURE", who, { vaultCode: thrown.code, coreCode: thrown.coreCode });
       return fail("INVARIANT_VIOLATION", who);
@@ -486,7 +504,8 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
       Object.freeze({
         captureId,
         text: plan.text,
-        tokens: Object.freeze(plan.retained.map((entry) => Object.freeze({ token: entry.token, type: entry.type }))),
+        tokens: Object.freeze(plan.retained.map((entry, index) => Object.freeze({ token: entry.token, type: entry.type,
+          ...(occurrenceIds === undefined ? {} : { occurrenceId: occurrenceIds[index] as string }) }))),
         passedThrough: plan.passedThrough,
         passedThroughTypes: plan.passedThroughTypes,
         unrestorable: plan.unrestorable,
@@ -636,6 +655,21 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
   // ---------------------------------------------------------------- restore
 
   async restore(request: PersistentRestoreRequest<Context>): Promise<PersistentRestoreResult> {
+    return this.#restore(request, "restore");
+  }
+
+  async preflightRestore(request: PersistentRestoreRequest<Context>): Promise<void> {
+    try { await this.#restore(request, "preflight"); }
+    catch (error) { throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION"); }
+  }
+
+  async consumeRestore(request: PersistentRestoreRequest<Context>): Promise<PersistentRestoreResult & { readonly values: readonly string[] }> {
+    return this.#restore(request, "consume").catch((error) => {
+      throw error instanceof VaultServerError ? error : new VaultServerError("INVARIANT_VIOLATION");
+    }) as Promise<PersistentRestoreResult & { readonly values: readonly string[] }>;
+  }
+
+  async #restore(request: PersistentRestoreRequest<Context>, mode: "restore" | "preflight" | "consume"): Promise<PersistentRestoreResult & { readonly values?: readonly string[] }> {
     this.#open();
     const parsed = this.#parseRestore(request);
     const { sink, purpose, requestId } = parsed;
@@ -685,8 +719,8 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
     if (parsed.uses.size === 0) {
       const fields: Record<string, string> = {};
       for (const [path, text] of parsed.snapshot) Object.defineProperty(fields, path, { value: text, enumerable: true, writable: false });
-      this.#audit({ operation: "restore", outcome: "committed", at, principalId: resolved.principal.id, tenant: resolved.tenant, sink, purpose, entries: 0, ...(requestId === undefined ? {} : { requestId }) });
-      return Object.freeze({ fields: Object.freeze(fields), restored: 0, principalId: resolved.principal.id, tenant: resolved.tenant });
+      if (mode !== "preflight") this.#audit({ operation: "restore", outcome: "committed", at, principalId: resolved.principal.id, tenant: resolved.tenant, sink, purpose, entries: 0, ...(requestId === undefined ? {} : { requestId }) });
+      return Object.freeze({ fields: Object.freeze(fields), restored: 0, principalId: resolved.principal.id, tenant: resolved.tenant, ...(mode === "consume" ? { values: Object.freeze([]) } : {}) });
     }
     if (parsed.uses.size > this.#i.capabilities.maxRestoreEntries) return deny("invalid-request");
 
@@ -704,8 +738,9 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
     }
 
     for (let round = 0; ; round += 1) {
-      const outcome = await this.#restoreOnce({ parsed, resolved, scope, uses, requestDigest, attemptId, at, deny, fail });
+      const outcome = await this.#restoreOnce({ parsed, resolved, scope, uses, requestDigest, attemptId, at, deny, fail, mode });
       if (outcome !== "stale") {
+        if (mode === "preflight") return outcome;
         this.#audit({
           operation: "restore",
           outcome: "committed",
@@ -735,8 +770,9 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
     readonly at: number;
     readonly deny: (reason: ServerDenialReason) => never;
     readonly fail: (code: ServerVaultErrorCode) => never;
-  }): Promise<PersistentRestoreResult | "stale"> {
-    const { parsed, resolved, scope, uses, requestDigest, attemptId, deny, fail } = input;
+    readonly mode: "restore" | "preflight" | "consume";
+  }): Promise<(PersistentRestoreResult & { readonly values?: readonly string[] }) | "stale"> {
+    const { parsed, resolved, scope, uses, requestDigest, attemptId, deny, fail, mode } = input;
     const { sink, purpose } = parsed;
     const now = this.#now();
 
@@ -899,6 +935,12 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
       // §7.4: narrow, not close, the window between policy and commit.
       if (revisionBefore !== undefined && currentRevision() !== revisionBefore) return deny("stale-policy");
 
+      if (mode === "preflight") {
+        const checkedAt = this.#now();
+        for (const capture of view.captures.values()) if (checkedAt >= capture.expiresAt) return deny("expired");
+        return Object.freeze({ fields: Object.freeze({}), restored: 0, principalId: resolved.principal.id, tenant: resolved.tenant });
+      }
+
       // Step 8: values become strings only now, when they are about to be returned.
       const values = new Map<string, string>();
       try {
@@ -908,11 +950,14 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
       }
       const staged: Record<string, string> = {};
       let restored = 0;
+      const occurrenceValues: string[] = [];
       for (const [path, text] of parsed.snapshot) {
         TOKEN_PATTERN.lastIndex = 0;
         const replaced = text.replace(TOKEN_PATTERN, (token) => {
           restored += 1;
-          return values.get(token) as string;
+          const value = values.get(token) as string;
+          if (mode === "consume") occurrenceValues.push(value);
+          return value;
         });
         TOKEN_PATTERN.lastIndex = 0;
         Object.defineProperty(staged, path, { value: replaced, enumerable: true, writable: false });
@@ -958,6 +1003,7 @@ class PersistentServerVaultImpl<Context> implements PersistentServerVault<Contex
           principalId: resolved.principal.id,
           tenant: resolved.tenant,
           attemptId,
+          ...(mode === "consume" ? { values: Object.freeze(occurrenceValues) } : {}),
         });
       }
       if (outcome === "already-committed") return deny("attempt-already-committed");

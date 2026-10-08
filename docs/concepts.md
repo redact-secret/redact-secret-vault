@@ -33,3 +33,7 @@ Restoration needs an issued vault token (`<rsv_…>`, 128 random bits, bound to 
 - Model output, tool arguments, and visible placeholder text cannot authorize their own restoration.
 
 The in-memory vault and the in-memory server implement these for their scope. The persistent items are implemented on `main` and qualified only as the [qualification record](research/qualification-persistence-0.1.0-alpha.1.md) states. The [security decision](decisions/restore-authority-and-lifecycle.md) distinguishes invariants from consumer choices.
+
+## Sibling transformation engines
+
+Caller/core/fastner findings go to anonymizer for composition, arbitration, replacement planning and forward construction. Vault owns token issuance, mapping lifecycle, grants and current authorization, expiry/revoke/use budgets, persistence and cryptography. Restore owns token discovery, the RestorePlan, authority interaction and reconstruction into the trusted destination. Neither sibling stores a second mapping or implements Vault authorization. [Accepted contracts](specs/vault-interop.md) preserve these boundaries independently of language.
