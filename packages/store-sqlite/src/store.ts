@@ -447,6 +447,11 @@ class SqliteStoreImpl implements SqliteStore {
     if (process.pid !== this.#pid) throw new StoreError("STORE_UNAVAILABLE");
     if (options?.signal?.aborted === true) throw new StoreError("STORE_UNAVAILABLE");
     const db = this.#db;
+    // Sample before BEGIN: a WAL writer may advance the marker after this
+    // reader's snapshot starts. Comparing that newer marker to an older
+    // snapshot would mistake normal concurrency for a restored database.
+    // Writes still check the live marker while holding BEGIN IMMEDIATE.
+    const readMarkerSnapshot = mode === "read" && this.#markerPath !== null ? readMarker(this.#markerPath) : undefined;
     let value: T;
     let head: Head;
     try {
@@ -463,7 +468,7 @@ class SqliteStoreImpl implements SqliteStore {
       }
       const meta = this.#q("SELECT database_id, counter FROM rsv_meta WHERE singleton = 1").get();
       if (meta === undefined) throw new StoreError("STORE_UNAVAILABLE");
-      head = this.#head(String(meta.database_id), toNumber(meta.counter));
+      head = this.#head(String(meta.database_id), toNumber(meta.counter), readMarkerSnapshot);
       if (mode === "write") this.#q("UPDATE rsv_meta SET counter = counter + 1 WHERE singleton = 1").run();
       value = body(head);
       this.#internals.beforeCommit?.();
@@ -511,12 +516,12 @@ class SqliteStoreImpl implements SqliteStore {
    * value than this process or the marker file has already seen is an older
    * copy. A different `database_id` is a different file at the same path.
    */
-  #head(databaseId: string, counter: number): Head {
+  #head(databaseId: string, counter: number, markerSnapshot?: Marker | null | "invalid"): Head {
     let rolledBack = false;
     const seen = HIGH_WATER.get(this.#path);
     if (seen !== undefined && (seen.databaseId !== databaseId || counter < seen.counter)) rolledBack = true;
     if (this.#markerPath !== null) {
-      const marker = readMarker(this.#markerPath);
+      const marker = markerSnapshot === undefined ? readMarker(this.#markerPath) : markerSnapshot;
       if (marker === "invalid") rolledBack = true;
       else if (marker !== null && (marker.databaseId !== databaseId || counter < marker.counter)) rolledBack = true;
     }

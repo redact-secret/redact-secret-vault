@@ -139,3 +139,7 @@ A failed capture returns no result, so no usable token leaves the server. When t
 - [`@redact-secret/key-provider-aws-kms`](../../packages/key-provider-aws-kms/README.md): the optional AWS KMS key provider.
 - [`@redact-secret/store-sqlite`](../../packages/store-sqlite/README.md) and its [reference](../reference/store-sqlite.md): a store on one SQLite file for processes of one host. Partial record, no support claim; power loss was not simulated.
 - [`@redact-secret/store-memory`](../../packages/store-memory/README.md): a non-durable store for tests.
+
+## Sibling engines
+
+The [interoperability contract](../specs/vault-interop.md) preserves this server's ciphertext-only stores and server-owned authorization. Restore preflight releases no value and consumes no budget; consume reruns eligibility and uses the existing whole-request transaction. Indeterminate outcomes must be resolved by attempt ID, never blindly retried or replayed. The [reference qualification](../research/qualification-vault-interop-v1.md) does not expand the existing PostgreSQL crash/failover qualification.

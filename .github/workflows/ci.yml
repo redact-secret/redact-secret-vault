@@ -31,6 +31,10 @@ jobs:
       - run: npm run check:persistence-boundaries
       - run: npm run check:links
       - run: npm run test:scripts
+      - name: Shared sibling interoperability vectors
+        run: |
+          npm run test:interop
+          python3 conformance/interop/v1/test.py
       - name: Validate conformance corpus JSON
         run: node -e 'JSON.parse(require("fs").readFileSync("conformance/v1/corpus.json","utf8"))'
 
@@ -144,6 +148,13 @@ jobs:
       - name: Create the serving role
         run: node packages/store-postgres/scripts/create-app-role.mjs
       - run: npm run test:postgres
+      # One native-engine run, using this existing database job rather than a new matrix.
+      - name: Pinned native sibling roundtrip and persistent authority
+        env:
+          RUSTUP_TOOLCHAIN: "1.98.1"
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update
+          npm run qualify:interop
       # The persistent example (examples/persistent): setup twice to show it is
       # idempotent, then capture in one process and restore in another.
       - name: Persistent example

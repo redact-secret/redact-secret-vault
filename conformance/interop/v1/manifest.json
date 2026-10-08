@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "vectorVersion": "1.0.0",
+  "contractRevision": "vault-interop-v1",
+  "vectorsSha256": "2b43fb232bf8d23aaaf55b3817167e6a8cc72a595408d018ff8f9f6de50c508c",
+  "schemaSha256": "71f0b1df2ec997c5558bb1c21db6ef1ba1ec7def2d93aac6b3a0dc949da609f3",
+  "consumers": {
+    "capture.repeated-occurrences": [
+      "js-public-api"
+    ],
+    "capture.correspondence": [
+      "js-public-api"
+    ],
+    "capture.source-binding": [
+      "js-public-api"
+    ],
+    "capture.partial-failure": [
+      "qualification/interop/reference.test.mjs: capture failure withholds output and mapping"
+    ],
+    "capture.abort-cleanup": [
+      "qualification/interop/reference.test.mjs: staged capture abort physically removes unpublished mappings"
+    ],
+    "capture.release-grants": [
+      "js-public-api"
+    ],
+    "capture.capture-limit": [
+      "js-public-api"
+    ],
+    "capture.persistent-create-failure": [
+      "js-persistent-fault"
+    ],
+    "restore.unknown": [
+      "js-public-api"
+    ],
+    "restore.forged": [
+      "js-public-api"
+    ],
+    "restore.wrong-capture": [
+      "js-public-api"
+    ],
+    "restore.wrong-source": [
+      "js-public-api"
+    ],
+    "restore.wrong-tenant": [
+      "js-public-api"
+    ],
+    "restore.wrong-principal": [
+      "js-public-api"
+    ],
+    "restore.wrong-session": [
+      "js-public-api"
+    ],
+    "restore.wrong-sink": [
+      "js-public-api"
+    ],
+    "restore.wrong-path": [
+      "js-public-api"
+    ],
+    "restore.wrong-purpose": [
+      "js-public-api"
+    ],
+    "restore.expired": [
+      "js-public-api"
+    ],
+    "restore.revoked": [
+      "js-public-api"
+    ],
+    "restore.exhausted": [
+      "js-public-api"
+    ],
+    "restore.duplicate-budget": [
+      "js-public-api"
+    ],
+    "restore.mixed-denial": [
+      "js-public-api"
+    ],
+    "restore.two-preflights": [
+      "js-public-api"
+    ],
+    "restore.revoke-before-consume": [
+      "js-public-api"
+    ],
+    "restore.consume-before-revoke": [
+      "js-public-api"
+    ],
+    "restore.postcommit-output-failure": [
+      "qualification/interop/reference.test.mjs: postcommit reconstruction failure burns uses"
+    ],
+    "restore.indeterminate-persistent": [
+      "js-persistent-fault"
+    ]
+  }
+}

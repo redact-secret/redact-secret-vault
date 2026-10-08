@@ -50,3 +50,7 @@ New here? Start with the [repository README](../README.md), then the README of t
 - [Conformance corpus](../conformance/README.md): language-neutral adversarial cases.
 - [Security policy](../SECURITY.md) and [releasing](../RELEASING.md).
 - Earlier research records and plans (core integration, Python server integration, executed verification, security research, pre-implementation plan, issue roadmap, alpha.1 orchestrator prompt) were retired in `a47d6d9`; they remain readable in the [archived `docs/`](https://github.com/redact-secret/redact-secret-vault/tree/0db9a33a654704f1afad9388f5fdf0cf403a6b01/docs) tree.
+
+## Forward and reverse interoperability
+
+[Contract revision vault-interop-v1](specs/vault-interop.md), [vectors](../conformance/interop/v1/README.md), [reference qualification](research/qualification-vault-interop-v1.md), and [native Rust distribution decision](decisions/native-rust-interop-boundary.md).

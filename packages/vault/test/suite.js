@@ -330,7 +330,7 @@ const runtimeChecks = {
     const surface = new Set();
     for (let o = vault; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) Object.getOwnPropertyNames(o).forEach((n) => surface.add(n));
     surface.delete("constructor");
-    assert(JSON.stringify([...surface].sort()) === JSON.stringify(["capture", "dispose", "piiActivation", "restore", "revoke", "stats"]), `unexpected vault surface ${[...surface]}`);
+    assert(JSON.stringify([...surface].sort()) === JSON.stringify(["capture", "captureOccurrences", "consumeRestore", "dispose", "piiActivation", "preflightRestore", "restore", "revoke", "stats"]), `unexpected vault surface ${[...surface]}`);
     const serialized = JSON.stringify(vault) + String(vault) + JSON.stringify(vault.stats());
     assert(!serialized.includes(F.GH), "serializing the vault exposed a value");
     vault.dispose();

@@ -25,6 +25,7 @@ export type {
   ServerAuditHook,
   ServerAuditOperation,
   ServerCaptureOptions,
+  ServerOccurrenceCaptureOptions,
   ServerDenialReason,
   ServerReleasePolicy,
   ServerRestoreRequest,
@@ -33,3 +34,6 @@ export type {
   ServerVaultOptions,
   ServerVaultStats,
 } from "./types.js";
+
+export { createRestoreAuthority, RestoreAuthorityError, RESTORE_INTEROP_REVISION } from "./interop-restore.js";
+export type { RestoreAuthorityPlan, RestoreOccurrence, RestoreAuthorityGrant, RestoreCommitState } from "./interop-restore.js";

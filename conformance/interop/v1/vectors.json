@@ -1,0 +1,542 @@
+{
+  "schemaVersion": 1,
+  "vectorVersion": "1.0.0",
+  "contractRevision": "vault-interop-v1",
+  "tokens": [
+    {
+      "id": "canonical",
+      "text": "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>",
+      "expected": {
+        "tokens": [
+          "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>"
+        ],
+        "markers": 1,
+        "malformed": false,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "marker-literal",
+      "text": "literal rsv_ marker",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "ordinary",
+      "text": "ordinary synthetic text",
+      "expected": {
+        "tokens": [],
+        "markers": 0,
+        "malformed": false,
+        "captureCollision": false
+      }
+    },
+    {
+      "id": "uppercase",
+      "text": "<RSV_AAAAAAAAAAAAAAAAAAAAAAAAAA>",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "cf-insertion",
+      "text": "<r​s‌v⁠_aaaaaaaaaaaaaaaaaaaaaaaaaa>",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "truncated",
+      "text": "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "invalid-body",
+      "text": "<rsv_aa0aaaaaaaaaaaaaaaaaaaaaaa>",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "duplicate",
+      "text": "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa> <rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>",
+      "expected": {
+        "tokens": [
+          "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>",
+          "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>"
+        ],
+        "markers": 2,
+        "malformed": false,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "bare-token",
+      "text": "rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": {
+        "tokens": [],
+        "markers": 1,
+        "malformed": true,
+        "captureCollision": true
+      }
+    },
+    {
+      "id": "unicode-surrounding",
+      "text": "🙂<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>é",
+      "expected": {
+        "tokens": [
+          "<rsv_aaaaaaaaaaaaaaaaaaaaaaaaaa>"
+        ],
+        "markers": 1,
+        "malformed": false,
+        "captureCollision": true
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "capture.repeated-occurrences",
+      "group": "capture",
+      "operation": "capture",
+      "input": {
+        "values": [
+          "SYNTHETIC-A",
+          "SYNTHETIC-A"
+        ]
+      },
+      "expected": {
+        "outcome": "committed",
+        "entries": 2,
+        "distinctTokens": true,
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.correspondence",
+      "group": "capture",
+      "operation": "capture",
+      "input": {
+        "values": [
+          "SYNTHETIC-A",
+          "SYNTHETIC-B"
+        ]
+      },
+      "expected": {
+        "outcome": "committed",
+        "entries": 2,
+        "orderedValues": [
+          "SYNTHETIC-A",
+          "SYNTHETIC-B"
+        ],
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.source-binding",
+      "group": "capture",
+      "operation": "source-binding",
+      "input": {
+        "values": [
+          "SYNTHETIC-A"
+        ]
+      },
+      "expected": {
+        "outcome": "denied",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "capture.partial-failure",
+      "group": "capture",
+      "operation": "stage-failure",
+      "input": {
+        "values": [
+          "SYNTHETIC-A",
+          "SYNTHETIC-B"
+        ]
+      },
+      "expected": {
+        "outcome": "aborted",
+        "entries": 0,
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.abort-cleanup",
+      "group": "capture",
+      "operation": "abort",
+      "input": {
+        "values": [
+          "SYNTHETIC-A"
+        ]
+      },
+      "expected": {
+        "outcome": "aborted",
+        "entries": 0,
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.release-grants",
+      "group": "capture",
+      "operation": "release",
+      "input": {
+        "values": [
+          "SYNTHETIC-A"
+        ],
+        "release": [
+          {
+            "sink": "sink-a",
+            "paths": [
+              "body",
+              "subject"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "committed",
+        "allowedPaths": [
+          "body",
+          "subject"
+        ],
+        "deniedPath": "wrong",
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.capture-limit",
+      "group": "capture",
+      "operation": "limit",
+      "input": {
+        "values": [
+          "SYNTHETIC-A",
+          "SYNTHETIC-B"
+        ],
+        "maxEntries": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "entries": 0,
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "capture.persistent-create-failure",
+      "group": "capture",
+      "operation": "persistent-create-failure",
+      "input": {
+        "fault": "unavailable"
+      },
+      "expected": {
+        "outcome": "denied",
+        "entries": 0,
+        "valuesReturned": 0
+      }
+    },
+    {
+      "id": "restore.unknown",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "unknown",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.forged",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "forged",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-capture",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "capture",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-source",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "source",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-tenant",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "tenant",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-principal",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "principal",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-session",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "session",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-sink",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "sink",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-path",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "path",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.wrong-purpose",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "purpose",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.expired",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "expiry",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.revoked",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "revoke",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.exhausted",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "budget",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.duplicate-budget",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "duplicate",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.mixed-denial",
+      "group": "restore",
+      "operation": "deny",
+      "input": {
+        "mutation": "mixed",
+        "maxUses": 1
+      },
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.two-preflights",
+      "group": "restore",
+      "operation": "race",
+      "input": {},
+      "expected": {
+        "outcome": "one-commit",
+        "commitState": "committed",
+        "valuesReturned": 1,
+        "usesConsumed": 1
+      }
+    },
+    {
+      "id": "restore.revoke-before-consume",
+      "group": "restore",
+      "operation": "revoke-first",
+      "input": {},
+      "expected": {
+        "outcome": "denied",
+        "commitState": "not-committed",
+        "valuesReturned": 0,
+        "usesConsumed": 0
+      }
+    },
+    {
+      "id": "restore.consume-before-revoke",
+      "group": "restore",
+      "operation": "consume-first",
+      "input": {},
+      "expected": {
+        "outcome": "committed",
+        "commitState": "committed",
+        "valuesReturned": 1,
+        "usesConsumed": 1
+      }
+    },
+    {
+      "id": "restore.postcommit-output-failure",
+      "group": "restore",
+      "operation": "postcommit-output",
+      "input": {},
+      "expected": {
+        "outcome": "denied",
+        "commitState": "committed",
+        "valuesReturned": 0,
+        "usesConsumed": 1
+      }
+    },
+    {
+      "id": "restore.indeterminate-persistent",
+      "group": "restore",
+      "operation": "indeterminate",
+      "input": {},
+      "expected": {
+        "outcome": "denied",
+        "commitState": "indeterminate",
+        "valuesReturned": 0,
+        "usesConsumed": null
+      }
+    }
+  ]
+}

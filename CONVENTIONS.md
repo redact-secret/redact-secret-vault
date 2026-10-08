@@ -31,3 +31,7 @@ Keep each README to what a consumer needs in five minutes: what the package is f
 ## Releases
 
 Publish independently of the core. A supported core version range requires integration tests at both ends. Do not claim browser, Node.js, Python, Rust, Go, CLI, persistent store, streaming, or host integration support until each is implemented and qualified.
+
+## Interoperability changes
+
+Change [vault-interop-v1](docs/specs/vault-interop.md) and versioned shared vectors together when altering token/capture/authority semantics. Keep native traits, optional development bridges, and named production qualification separate. Consumer findings never replace Vault authorization and a reference fixture never establishes native Rust Vault support.

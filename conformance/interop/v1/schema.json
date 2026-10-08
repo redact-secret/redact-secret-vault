@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/redact-secret/redact-secret-vault/conformance/interop/v1/schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "vectorVersion",
+    "contractRevision",
+    "tokens",
+    "scenarios"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "vectorVersion": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$"
+    },
+    "contractRevision": {
+      "const": "vault-interop-v1"
+    },
+    "tokens": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tokens",
+              "markers",
+              "malformed",
+              "captureCollision"
+            ],
+            "properties": {
+              "tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^<rsv_[a-z2-7]{26}>$"
+                }
+              },
+              "markers": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "malformed": {
+                "type": "boolean"
+              },
+              "captureCollision": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "group",
+          "operation",
+          "input",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "group": {
+            "enum": [
+              "capture",
+              "restore"
+            ]
+          },
+          "operation": {
+            "enum": [
+              "capture",
+              "source-binding",
+              "stage-failure",
+              "abort",
+              "release",
+              "limit",
+              "persistent-create-failure",
+              "deny",
+              "race",
+              "revoke-first",
+              "consume-first",
+              "postcommit-output",
+              "indeterminate"
+            ]
+          },
+          "input": {
+            "type": "object"
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "outcome",
+              "valuesReturned"
+            ],
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "committed",
+                  "denied",
+                  "aborted",
+                  "one-commit"
+                ]
+              },
+              "commitState": {
+                "enum": [
+                  "not-committed",
+                  "committed",
+                  "indeterminate"
+                ]
+              },
+              "valuesReturned": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "entries": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "usesConsumed": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "distinctTokens": {
+                "type": "boolean"
+              },
+              "orderedValues": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deniedPath": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  }
+}

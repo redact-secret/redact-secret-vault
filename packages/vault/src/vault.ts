@@ -1,3 +1,4 @@
+import { planOccurrences } from "./capture-occurrences.js";
 import { installedCore } from "./core-module.js";
 import type { CoreModule } from "./core-module.js";
 import {
@@ -10,7 +11,7 @@ import {
   TOKEN_ATTEMPTS,
   utf8Length,
 } from "./capture-plan.js";
-import type { PlanRandom } from "./capture-plan.js";
+import type { CapturePlan, PlanRandom } from "./capture-plan.js";
 import { VaultError } from "./errors.js";
 import type { DenialReason, VaultErrorCode } from "./errors.js";
 import { ExpiryQueue } from "./expiry-queue.js";
@@ -20,6 +21,9 @@ import type {
   AuditEvent,
   AuditHook,
   CaptureOptions,
+  CaptureOccurrence,
+  OccurrenceCaptureOptions,
+  OccurrenceCaptureResult,
   CaptureResult,
   IssuedToken,
   ReleasePolicy,
@@ -185,8 +189,33 @@ class InMemoryVault implements Vault {
     return this.#run("capture", (at) => this.#capture(input, options, at));
   }
 
+  captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: OccurrenceCaptureOptions): OccurrenceCaptureResult {
+    return this.#run("capture", (at) => {
+      const plan = planOccurrences(input, occurrences, options, this.#limits, {
+        random: this.#random,
+        isTaken: (token) => this.#entries.has(token),
+        budget: () => {
+          this.#sweep(at);
+          return { liveEntries: this.#entries.size, retainedBytes: this.#retainedBytes };
+        },
+      });
+      const ids = plan.occurrenceIds;
+      const result = this.#commitCapture(input, plan, at);
+      return Object.freeze({ ...result, tokens: Object.freeze(result.tokens.map((token, index) =>
+        Object.freeze({ ...token, occurrenceId: ids[index] as string }))) });
+    });
+  }
+
   restore(request: RestoreRequest): RestoreResult {
     return this.#run("restore", (at) => this.#restore(request, at));
+  }
+
+  preflightRestore(request: RestoreRequest): void {
+    this.#run("restore", (at) => this.#restore(request, at, "preflight"));
+  }
+
+  consumeRestore(request: RestoreRequest): RestoreResult & { readonly values: readonly string[] } {
+    return this.#run("restore", (at) => this.#restore(request, at, "consume")) as RestoreResult & { readonly values: readonly string[] };
   }
 
   revoke(captureId: string): number {
@@ -294,6 +323,10 @@ class InMemoryVault implements Vault {
       },
     });
 
+    return this.#commitCapture(input, plan, at);
+  }
+
+  #commitCapture(input: string, plan: CapturePlan, at: number): CaptureResult {
     // Commit.
     const captureId = this.#issueCaptureId();
     const expiresAt = at + this.#limits.entryTtlMs;
@@ -339,7 +372,7 @@ class InMemoryVault implements Vault {
     });
   }
 
-  #restore(request: RestoreRequest, at: number): RestoreResult {
+  #restore(request: RestoreRequest, at: number, mode: "restore" | "preflight" | "consume" = "restore"): RestoreResult & { readonly values?: readonly string[] } {
     if (typeof request !== "object" || request === null) throw new VaultError("INVALID_ARGUMENT");
     const { sink, fields, captures } = request;
     if (!isIdentifier(sink)) throw new VaultError("INVALID_ARGUMENT");
@@ -438,10 +471,18 @@ class InMemoryVault implements Vault {
       // the entries validated above are still the live ones.
     }
 
-    // Commit: consume budgets, then build the restored fields.
+    if (mode === "preflight") return Object.freeze({ fields: Object.freeze({}), restored: 0 });
+
+    // Build privately before the atomic budget mutation. No plaintext is handed
+    // to a caller until the whole batch has committed.
+    const values: string[] = [];
     const out: Record<string, string> = {};
     for (const [path, text] of snapshot) {
-      const restored = text.replace(TOKEN_PATTERN, (token) => (uses.get(token) as Use).entry.value);
+      const restored = text.replace(TOKEN_PATTERN, (token) => {
+        const value = (uses.get(token) as Use).entry.value;
+        if (mode === "consume") values.push(value);
+        return value;
+      });
       TOKEN_PATTERN.lastIndex = 0;
       Object.defineProperty(out, path, { value: restored, enumerable: true, writable: false });
     }
@@ -458,7 +499,7 @@ class InMemoryVault implements Vault {
       sink,
       fields: snapshot.length,
     });
-    return Object.freeze({ fields: Object.freeze(out), restored: occurrences });
+    return Object.freeze({ fields: Object.freeze(out), restored: occurrences, ...(mode === "consume" ? { values: Object.freeze(values) } : {}) });
   }
 
   #issueCaptureId(): string {

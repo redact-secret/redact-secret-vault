@@ -361,7 +361,7 @@ test("a planner on a beta.9-shaped core has PII off and plans with nothing held"
   const planner = await openCapturePlannerFor(fake.module);
   assert.equal(planner.piiActivation, null);
   assert.ok(Object.isFrozen(planner));
-  assert.deepEqual(Object.keys(planner).sort(), ["newCaptureId", "piiActivation", "plan"]);
+  assert.deepEqual(Object.keys(planner).sort(), ["newCaptureId", "piiActivation", "plan", "planOccurrences"]);
   assert.deepEqual(fake.calls.initialize, [undefined], "initialized the core once, as openVault does");
 
   const input = `x ${gh(1)} y ${gh(2)}`;

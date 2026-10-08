@@ -1,4 +1,4 @@
-import type { AuditHook, CaptureOptions, CaptureResult, VaultLimits, VaultOptions } from "@redact-secret/vault";
+import type { AuditHook, CaptureOptions, CaptureResult, CaptureOccurrence, OccurrenceCaptureOptions, OccurrenceCaptureResult, VaultLimits, VaultOptions } from "@redact-secret/vault";
 import type { DenialReason, VaultErrorCode } from "@redact-secret/vault";
 
 import type { ServerVaultErrorCode } from "./errors.js";
@@ -197,6 +197,8 @@ export interface ServerVaultStats {
 }
 
 export interface ServerVault<Context = unknown> {
+  preflightRestore(request: ServerRestoreRequest<Context>): Promise<void>;
+  consumeRestore(request: ServerRestoreRequest<Context>): Promise<ServerRestoreResult & { readonly values: readonly string[] }>;
   /**
    * The wrapped vault's `piiActivation`: the core's canonical PII activation
    * identity observed at creation, or `null` when the installed core has no
@@ -204,6 +206,7 @@ export interface ServerVault<Context = unknown> {
    */
   readonly piiActivation: string | null;
   capture(input: string, options: ServerCaptureOptions): Promise<CaptureResult>;
+  captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: ServerOccurrenceCaptureOptions): Promise<OccurrenceCaptureResult>;
   restore(request: ServerRestoreRequest<Context>): Promise<ServerRestoreResult>;
   /** Removes every entry of one capture and tombstones it so a later restore reports "revoked". */
   revoke(captureId: string): Promise<number>;
@@ -257,3 +260,8 @@ export interface ServerVaultOptions<Context = unknown> {
 }
 
 export type { DenialReason, VaultErrorCode } from "@redact-secret/vault";
+
+/** Host authenticates capture-time context, as for ServerCaptureOptions. */
+export interface ServerOccurrenceCaptureOptions extends OccurrenceCaptureOptions {
+  readonly issuedTenant: string;
+}

@@ -226,6 +226,10 @@ export interface VaultStats {
 }
 
 export interface Vault {
+  /** Check a whole request without releasing plaintext or consuming uses. */
+  preflightRestore(request: RestoreRequest): void;
+  /** Whole-request commit; values follow request field order, then token order. */
+  consumeRestore(request: RestoreRequest): RestoreResult & { readonly values: readonly string[] };
   /**
    * The core's canonical PII activation identity observed at `createVault`,
    * or `null` when the installed core has no PII surface (beta.9). Fixed for
@@ -233,9 +237,31 @@ export interface Vault {
    */
   readonly piiActivation: string | null;
   capture(input: string, options: CaptureOptions): CaptureResult;
+  /** Captures trusted finalized spans without detection. Single-principal process only. */
+  captureOccurrences(input: string, occurrences: readonly CaptureOccurrence[], options: OccurrenceCaptureOptions): OccurrenceCaptureResult;
   restore(request: RestoreRequest): RestoreResult;
   /** Removes every entry of one capture. Returns the number removed. */
   revoke(captureId: string): number;
   dispose(): void;
   stats(): VaultStats;
+}
+
+/** Trusted host-finalized occurrence. Offsets are UTF-8 bytes, not JS indices. */
+export interface CaptureOccurrence {
+  readonly occurrenceId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly type: string;
+  readonly action: "redact" | "block" | "warn" | "allow";
+}
+export interface OccurrenceCaptureOptions {
+  readonly release: readonly ReleaseGrant[];
+  readonly maxUses?: number;
+  readonly pii?: PiiRetention;
+}
+export interface OccurrenceIssuedToken extends IssuedToken {
+  readonly occurrenceId: string;
+}
+export interface OccurrenceCaptureResult extends Omit<CaptureResult, "tokens"> {
+  readonly tokens: readonly OccurrenceIssuedToken[];
 }
