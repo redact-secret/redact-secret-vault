@@ -52,7 +52,7 @@
     "test": "node --test"
   },
   "devDependencies": {
-    "@aws-sdk/client-kms": "3.1144.0",
+    "@aws-sdk/client-kms": "3.1156.0",
     "@redact-secret/vault-conformance": "0.1.0-alpha.1",
     "@redact-secret/vault-crypto": "0.1.0-alpha.1"
   }
