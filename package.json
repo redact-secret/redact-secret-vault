@@ -39,7 +39,7 @@
     "qualify:interop": "node qualification/interop/prepare.mjs && node --test qualification/interop/reference.test.mjs qualification/interop/postgres.test.mjs && node qualification/interop/measure.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.6.3",
     "@redact-secret/core": "0.1.0-beta.14",
     "fast-check": "4.10.2",
     "playwright": "1.63.0",
